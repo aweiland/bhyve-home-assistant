@@ -188,13 +188,13 @@ class BHyveConfigFlow(ConfigFlow, domain=DOMAIN):
         return BhyveOptionsFlowHandler()
 
 
-@staticmethod
-@callback
-def async_get_options_flow(
-    config_entry: ConfigEntry,
-) -> BhyveOptionsFlowHandler:
-    """Create the options flow."""
-    return BhyveOptionsFlowHandler()
+# @staticmethod
+# @callback
+# def async_get_options_flow(
+#     config_entry: ConfigEntry,
+# ) -> BhyveOptionsFlowHandler:
+#     """Create the options flow."""
+#     return BhyveOptionsFlowHandler()
 
 class BhyveOptionsFlowHandler(OptionsFlowWithReload):
     """Options flow for picking devices."""
