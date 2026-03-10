@@ -198,10 +198,10 @@ class BhyveOptionsFlowHandler(OptionsFlowWithReload):
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
-        if self.config_entry.state != ConfigEntryState.LOADED:
+        if self._config_entry.state != ConfigEntryState.LOADED:
             return self.async_abort(reason="unknown")
 
-        data = self.hass.data[DOMAIN][self.config_entry.entry_id]
+        data = self.hass.data[DOMAIN][self._config_entry.entry_id]
         try:
             client = data["client"]
             result = await client.login()
@@ -228,7 +228,7 @@ class BhyveOptionsFlowHandler(OptionsFlowWithReload):
                 {
                     vol.Required(
                         CONF_DEVICES,
-                        default=self.config_entry.options.get(CONF_DEVICES),
+                        default=self._config_entry.options.get(CONF_DEVICES),
                     ): cv.multi_select(device_options),
                 }
             ),
