@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone, UTC
 from typing import TYPE_CHECKING, Any
+import re
 
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -31,6 +32,53 @@ if TYPE_CHECKING:
     from .pybhyve.typings import BHyveDevice, BHyveTimerProgram
 
 _LOGGER = logging.getLogger(__name__)
+
+
+# Simple ISO-like detection (fast pre-check before parsing)
+ISO_DATE_RE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}"  # YYYY-MM-DD
+    r"(?:[T\s]\d{2}:\d{2}:\d{2}"  # optional time
+    r"(?:\.\d+)?"  # optional milliseconds
+    r"(?:Z|[+-]\d{2}:\d{2})?)?$"  # optional timezone
+)
+
+
+def try_parse_datetime(value: str):
+    """Attempt to parse a string into a datetime. Return original if it fails."""
+    if not isinstance(value, str):
+        return value
+
+    if not ISO_DATE_RE.match(value):
+        return value
+
+    try:
+        # Normalize Z → +00:00 for fromisoformat
+        if value.endswith("Z"):
+            value = value[:-1] + "+00:00"
+
+        return datetime.fromisoformat(value)
+
+        # If it's a date only (no time), you may want to keep it as date
+    except ValueError:
+        return value
+
+
+def convert_dates(obj):
+    """Recursively convert date-like strings in nested structures."""
+    if isinstance(obj, dict):
+        return {k: convert_dates(v) for k, v in obj.items()}
+
+    elif isinstance(obj, list):
+        return [convert_dates(v) for v in obj]
+
+    elif isinstance(obj, tuple):
+        return tuple(convert_dates(v) for v in obj)
+
+    elif isinstance(obj, str):
+        return try_parse_datetime(obj)
+
+    else:
+        return obj
 
 
 class BHyveDataUpdateCoordinator(DataUpdateCoordinator):
@@ -104,6 +152,7 @@ class BHyveDataUpdateCoordinator(DataUpdateCoordinator):
                     history = []
                     landscapes = {}
 
+                _LOGGER.debug(f"Set {device_id} history to {history}")
                 data["devices"][device_id] = {
                     "device": device,
                     "history": history,
@@ -208,8 +257,18 @@ class BHyveDataUpdateCoordinator(DataUpdateCoordinator):
             )
             return
 
+        event_data = convert_dates(event_data)  # type: ignore
+
+        # if event_data.get("timestamp"):
+        #     s = str(event_data.get("timestamp"))
+        #     event_data["timestamp"] = datetime.strptime(
+        #         s, "%Y-%m-%dT%H:%M:%S.%fZ"
+        #     ).replace(tzinfo=UTC)
+
         # Update specific device data based on event type
         device_data = self.data["devices"][device_id]["device"]
+
+        _LOGGER.debug(f"Handling incoming event {event} for device {device_id}")
 
         if event == EVENT_BATTERY_STATUS:
             # Update battery information

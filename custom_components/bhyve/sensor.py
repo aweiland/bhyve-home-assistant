@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -343,7 +344,7 @@ class BHyveZoneHistorySensor(BHyveCoordinatorEntity, SensorEntity):
         )
 
     @property
-    def native_value(self) -> str | None:
+    def native_value(self) -> datetime | None:
         """Return the state of the entity."""
         history = self._get_device_history()
         if not history:
@@ -363,7 +364,7 @@ class BHyveZoneHistorySensor(BHyveCoordinatorEntity, SensorEntity):
                 if start_time:
                     local_time = orbit_time_to_local_time(start_time)
                     if local_time:
-                        return local_time.isoformat()
+                        return local_time
         return None
 
     @property

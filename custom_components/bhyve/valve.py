@@ -234,6 +234,7 @@ class BHyveZoneValve(BHyveCoordinatorEntity, ValveEntity):
 
     entity_description: BHyveValveEntityDescription
     _attr_supported_features = ValveEntityFeature.OPEN | ValveEntityFeature.CLOSE
+    _attr_has_entity_name = True
 
     def __init__(
         self,
@@ -267,16 +268,24 @@ class BHyveZoneValve(BHyveCoordinatorEntity, ValveEntity):
         self._initial_programs = device_programs
 
     @property
+    def name(self) -> str:
+        """Entity name."""
+        return self._attr_name
+
+    @property
     def is_closed(self) -> bool:
         """Return if valve is closed."""
         status = self.device_data.get("status", {})
         watering_status = status.get("watering_status")
 
-        if watering_status:
-            current_station = watering_status.get("current_station")
-            # Valve is open (watering) if current_station matches this zone
-            return str(current_station) != str(self._zone_id)
-        return True
+        _LOGGER.debug(f"Watering status: {watering_status}")
+
+        return watering_status is None
+        # if watering_status:
+        #     current_station = watering_status.get("current_station")
+        #     # # Valve is open (watering) if current_station matches this zone
+        #     return str(current_station) != str(self._zone_id)
+        # return False
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -293,11 +302,15 @@ class BHyveZoneValve(BHyveCoordinatorEntity, ValveEntity):
         status = self.device_data.get("status", {})
         watering_status = status.get("watering_status")
 
+        _LOGGER.debug(f"xtra attr status: {watering_status}")
+
         # Get zone data from coordinator
         zones = self.device_data.get("zones", [])
         zone = next(filter(lambda z: z.get("station") == self._zone_id, zones), None)
 
-        if zone is not None:
+        _LOGGER.debug(f"xtra attr zone: {zone}")
+
+        if watering_status is not None and zone is not None:
             # Add zone-specific attributes
             sprinkler_type = zone.get("sprinkler_type")
             if sprinkler_type is not None:
@@ -319,9 +332,11 @@ class BHyveZoneValve(BHyveCoordinatorEntity, ValveEntity):
             )
 
         # Add watering status if actively watering this zone
-        if watering_status and str(watering_status.get("current_station")) == str(
-            self._zone_id
-        ):
+        if watering_status and isinstance(
+            watering_status, dict
+        ):  # and str(watering_status.get("current_station")) == str(
+            # self._zone_id
+            # ):
             started_watering_at = watering_status.get("started_watering_station_at")
             started_watering_at_timestamp = (
                 orbit_time_to_local_time(started_watering_at)
@@ -375,7 +390,7 @@ class BHyveZoneValve(BHyveCoordinatorEntity, ValveEntity):
         # Filter out any run times which are not for this valve
         active_program_run_times = list(
             filter(
-                lambda x: (x.get("station") == self._zone_id),
+                lambda x: x.get("station") == self._zone_id,
                 program.get("run_times", []),
             )
         )
@@ -399,7 +414,7 @@ class BHyveZoneValve(BHyveCoordinatorEntity, ValveEntity):
                 run_times = plan.get("run_times")
                 if run_times:
                     zone_times = list(
-                        filter(lambda x: (x.get("station") == self._zone_id), run_times)
+                        filter(lambda x: x.get("station") == self._zone_id, run_times)
                     )
                     if zone_times:
                         plan_date = orbit_time_to_local_time(plan.get("date"))
